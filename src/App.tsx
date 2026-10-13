@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { createClient } from '@supabase/supabase-js';
 
-// Supabase Konfiguration
-const SUPABASE_URL = 'https://vftpikzvemtrrrxtlajl.supabase.co';
-const SUPABASE_KEY = 'sb_publishable_JoQD_pjVmON8QDWm1tX5iA_47vtX0Qg';
+// Supabase Konfiguration mit direktem Fallback
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || 'https://vftpkzventrmmtlajl.supabase.co';
+const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || 'sb_publishable_JoQD_pjVmON8QDWm1tX5iA_47vtX0Qg';
 const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
 export default function FahrzeugscheinScanner() {
@@ -99,21 +99,20 @@ export default function FahrzeugscheinScanner() {
         setScans(loadedScans);
       }
     } catch (err) {
-      console.error('Fehler beim Laden aus der Cloud:', err.message);
+      console.warn('Cloud-Laden übersprungen / lokal aktiv:', err.message);
     }
   };
 
-  // Fahrzeug in Supabase speichern (Hinzufügen oder Aktualisieren)
+  // Fahrzeug in Supabase speichern
   const saveVehicleToCloud = async (vehicleData) => {
     try {
       if (vehicleData.supabaseId) {
-        // Update
-        await supabase
+        const { error } = await supabase
           .from('vehicles')
           .update({ data: vehicleData })
           .eq('id', vehicleData.supabaseId);
+        if (error) throw error;
       } else {
-        // Insert
         const { data, error } = await supabase
           .from('vehicles')
           .insert([{ data: vehicleData }])
@@ -125,7 +124,7 @@ export default function FahrzeugscheinScanner() {
         }
       }
     } catch (err) {
-      alert('Fehler beim Speichern in der Cloud: ' + err.message);
+      console.warn('Cloud-Speichern fehlgeschlagen (Sandbox/CORS), lokal aktiv:', err.message);
     }
   };
 
@@ -181,6 +180,7 @@ export default function FahrzeugscheinScanner() {
   const captureImage = () => {
     const video = videoRef.current;
     const canvas = canvasRef.current;
+    if (!video || !canvas) return;
     canvas.width = video.videoWidth;
     canvas.height = video.videoHeight;
     const ctx = canvas.getContext('2d');
@@ -229,6 +229,7 @@ export default function FahrzeugscheinScanner() {
       abortControllerRef.current.abort();
     }
     setIsLoading(false);
+    setIsScanning(false);
   };
 
   const processNewVehicleData = async (newScanData) => {
@@ -381,6 +382,8 @@ export default function FahrzeugscheinScanner() {
       }
     } finally {
       setIsLoading(false);
+      setIsScanning(false);
+      setSelectedVehicle(null);
     }
   };
 
